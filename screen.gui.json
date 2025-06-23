@@ -1,0 +1,183 @@
+{
+  "Apptrix": {
+    "Version": "1"
+  },
+  "Metadata": {
+    "height": 254,
+    "width": 289
+  },
+  "Screens": [
+    {
+      "Object": {
+        "Type": "*fy  ne.Container",
+        "Layout": "Border",
+        "Objects": [
+          {
+            "Type": "*fyne.Container",
+            "Layout": "VBox",
+            "Objects": [
+              {
+                "Type": "*widget.Label",
+                "Name": "name",
+                "Struct": {
+                  "Hidden": false,
+                  "Text": "Screen Label",
+                  "Alignment": 0,
+                  "Wrapping": 0,
+                  "TextStyle": {
+                    "Bold": false,
+                    "Italic": false,
+                    "Monospace": false,
+                    "Symbol": false,
+                    "TabWidth": 0,
+                    "Underline": false
+                  },
+                  "Truncation": 0,
+                  "Importance": 0,
+                  "SizeName": "",
+                  "Selectable": false
+                },
+                "Properties": {
+                  "name": "name"
+                }
+              },
+              {
+                "Type": "*fyne.Container",
+                "Layout": "Grid",
+                "Objects": [
+                  {
+                    "Type": "*widget.Check",
+                    "Name": "active",
+                    "Struct": {
+                      "Hidden": false,
+                      "Text": "Active",
+                      "Checked": false,
+                      "Partial": false
+                    },
+                    "Properties": {
+                      "name": "active"
+                    }
+                  },
+                  {
+                    "Type": "*widget.Check",
+                    "Name": "primary",
+                    "Struct": {
+                      "Hidden": false,
+                      "Text": "Primary",
+                      "Checked": false,
+                      "Partial": false
+                    },
+                    "Properties": {
+                      "name": "primary"
+                    }
+                  }
+                ],
+                "Properties": {
+                  "layout": "Grid"
+                }
+              },
+              {
+                "Type": "*widget.Select",
+                "Name": "location",
+                "Struct": {
+                  "Hidden": false,
+                  "Alignment": 0,
+                  "Selected": "Mirror",
+                  "Options": [
+                    "Mirror",
+                    "LeftOf",
+                    "RightOf",
+                    "Above",
+                    "Below"
+                  ],
+                  "PlaceHolder": "(Select one)"
+                },
+                "Properties": {
+                  "name": "location"
+                }
+              }
+            ]
+          },
+          {
+            "Type": "*fyne.Container",
+            "Layout": "Padded",
+            "Objects": [
+              {
+                "Type": "*fyne.Container",
+                "Layout": "Stack",
+                "Objects": [
+                  {
+                    "Type": "*canvas.Rectangle",
+                    "Struct": {
+                      "Hidden": false,
+                      "FillColor": {
+                        "R": 48,
+                        "G": 48,
+                        "B": 48,
+                        "A": 255
+                      },
+                      "StrokeColor": {
+                        "Y": 0
+                      },
+                      "StrokeWidth": 5,
+                      "CornerRadius": 0
+                    }
+                  },
+                  {
+                    "Type": "*fyne.Container",
+                    "Layout": "Center",
+                    "Objects": [
+                      {
+                        "Type": "*widget.Label",
+                        "Name": "resolution",
+                        "Struct": {
+                          "Hidden": false,
+                          "Text": "Label",
+                          "Alignment": 0,
+                          "Wrapping": 0,
+                          "TextStyle": {
+                            "Bold": false,
+                            "Italic": false,
+                            "Monospace": false,
+                            "Symbol": false,
+                            "TabWidth": 0,
+                            "Underline": false
+                          },
+                          "Truncation": 0,
+                          "Importance": 0,
+                          "SizeName": "",
+                          "Selectable": false
+                        },
+                        "Properties": {
+                          "name": "resolution"
+                        }
+                      }
+                    ],
+                    "Properties": {
+                      "layout": "Center"
+                    }
+                  }
+                ],
+                "Properties": {
+                  "layout": "Stack"
+                }
+              }
+            ],
+            "Properties": {
+              "layout": "Padded"
+            }
+          }
+        ],
+        "Properties": {
+          "bottom": "",
+          "dir": "vertical",
+          "layout": "Border",
+          "left": "",
+          "right": "",
+          "top": "0"
+        }
+      },
+      "Name": ""
+    }
+  ]
+}

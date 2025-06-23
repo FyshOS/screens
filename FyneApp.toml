@@ -1,0 +1,5 @@
+[Details]
+Name = "screens"
+
+[Migrations]
+  fyneDo = true
