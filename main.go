@@ -88,13 +88,15 @@ func (g *gui) loadScreens(w fyne.Window) {
 		return
 	}
 
-	newState := State{}
+	newState := State{
+		configTimestamp: resources.ConfigTimestamp,
+	}
 	for _, mode := range resources.Modes {
 		newState.modes = append(newState.modes, Mode{id: randr.Mode(mode.Id), Width: mode.Width, Height: mode.Height})
 	}
 
 	for _, crtc := range resources.Crtcs {
-		info, err := randr.GetCrtcInfo(conn, crtc, 0).Reply()
+		info, err := randr.GetCrtcInfo(conn, crtc, resources.ConfigTimestamp).Reply()
 		if err != nil {
 			dialog.ShowError(err, w)
 			return
@@ -108,7 +110,7 @@ func (g *gui) loadScreens(w fyne.Window) {
 			}
 		}
 
-		ctrl := Controller{id: crtc, Mode: m, X: info.X, Y: info.Y}
+		ctrl := Controller{id: crtc, Mode: m, Outputs: info.Outputs, X: info.X, Y: info.Y}
 		newState.controllers = append(newState.controllers, ctrl)
 	}
 
@@ -125,11 +127,10 @@ func (g *gui) loadScreens(w fyne.Window) {
 		}
 
 		var m *Mode
-		modes := []Mode{}
+		var modes []Mode
 		if len(info.Modes) == 0 {
 			continue
 		} else {
-			bestMode := info.Modes[0]
 			for _, mid := range info.Modes {
 				for _, m2 := range newState.modes {
 					if m2.id == mid {
@@ -138,7 +139,7 @@ func (g *gui) loadScreens(w fyne.Window) {
 				}
 			}
 			for _, c2 := range newState.controllers {
-				if c2.Mode != nil && c2.Mode.id == bestMode {
+				if c2.id == info.Crtc {
 					m = c2.Mode
 
 					break
@@ -146,7 +147,7 @@ func (g *gui) loadScreens(w fyne.Window) {
 			}
 		}
 
-		newOutput := Output{id: screen, CurrentMode: m, Modes: modes, Name: string(info.Name)}
+		newOutput := Output{id: screen, ctrl: info.Crtc, CurrentMode: m, Modes: modes, Name: string(info.Name)}
 		newState.outputs = append(newState.outputs, newOutput)
 	}
 	state = newState
@@ -185,12 +186,40 @@ func (g *gui) loadScreens(w fyne.Window) {
 			g.deactivate(state.outputs[i])
 		}
 
-		width, height := uint16(0), uint16(0)
-		if output.CurrentMode != nil {
-			width, height = output.CurrentMode.Width, output.CurrentMode.Height
+		modes := map[string]Mode{}
+		panel.resolution.OnChanged = nil
+		var options []string
+		for _, m := range output.Modes {
+			mode := fmt.Sprintf("%dx%d", m.Width, m.Height)
+
+			found := false
+			for _, added := range options {
+				if added == mode {
+					found = true
+					break
+				}
+			}
+			if !found {
+				options = append(options, mode)
+				modes[mode] = m
+			}
 		}
-		panel.resolution.Alignment = fyne.TextAlignCenter
-		panel.resolution.SetText(fmt.Sprintf("%s\n%dx%d", output.Name, width, height))
+		panel.resolution.SetOptions(options)
+
+		if output.CurrentMode != nil {
+			selected := fmt.Sprintf("%dx%d", output.CurrentMode.Width, output.CurrentMode.Height)
+			panel.resolution.SetSelected(selected)
+		}
+		panel.resolution.OnChanged = func(m string) {
+			_, err := randr.SetCrtcConfig(conn, output.ctrl, 0, state.configTimestamp,
+				0, 0, modes[m].id, randr.RotationRotate0, []randr.Output{output.id}).Reply()
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("failed to set resolution: %w", err), w)
+			}
+		}
+
+		panel.label.Alignment = fyne.TextAlignCenter
+		panel.label.SetText(output.Name)
 
 		g.connected.Add(ui)
 	}
@@ -211,8 +240,12 @@ func (g *gui) activate(out Output) {
 		return
 	}
 
-	// ignore response as we will reload
-	_ = randr.SetCrtcConfig(conn, (*ctrl).id, 0, 0, x, 0, out.Modes[0].id, randr.RotationRotate0, []randr.Output{out.id})
+	// Use config timestamp and check for errors
+	_, err := randr.SetCrtcConfig(conn, (*ctrl).id, 0, state.configTimestamp,
+		x, 0, out.Modes[0].id, randr.RotationRotate0, []randr.Output{out.id}).Reply()
+	if err != nil {
+		fyne.LogError("Failed to activate output", err)
+	}
 }
 
 func (g *gui) deactivate(out Output) {

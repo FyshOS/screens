@@ -1,18 +1,23 @@
 package main
 
-import "github.com/BurntSushi/xgb/randr"
+import (
+	"github.com/BurntSushi/xgb/randr"
+	"github.com/BurntSushi/xgb/xproto"
+)
 
 type State struct {
-	controllers []Controller
-	outputs     []Output
-	modes       []Mode
+	controllers     []Controller
+	outputs         []Output
+	modes           []Mode
+	configTimestamp xproto.Timestamp
 }
 
 type Controller struct {
 	id randr.Crtc
 
-	Mode *Mode
-	X, Y int16
+	Mode    *Mode
+	Outputs []randr.Output
+	X, Y    int16
 }
 
 type Mode struct {
@@ -22,7 +27,8 @@ type Mode struct {
 }
 
 type Output struct {
-	id randr.Output
+	id   randr.Output
+	ctrl randr.Crtc
 
 	CurrentMode *Mode
 	Modes       []Mode

@@ -12,11 +12,14 @@ import (
 )
 
 type screenGui struct {
-	name       *widget.Label
+	win fyne.Window
+
 	active     *widget.Check
-	primary    *widget.Check
+	label      *widget.Label
 	location   *widget.Select
-	resolution *widget.Label
+	name       *widget.Label
+	primary    *widget.Check
+	resolution *widget.Select
 }
 
 func newScreenGUI() *screenGui {
@@ -24,11 +27,12 @@ func newScreenGUI() *screenGui {
 }
 
 func (g *screenGui) makeUI() fyne.CanvasObject {
-	g.name = widget.NewLabel("Screen Label")
 	g.active = widget.NewCheck("Active", func(b bool) {})
+	g.label = widget.NewLabel("Label")
+	g.location = &widget.Select{Options: []string{"Mirror", "LeftOf", "RightOf", "Above", "Below"}, Selected: "Mirror", OnChanged: func(s string) {}}
+	g.name = widget.NewLabel("Screen Label")
 	g.primary = widget.NewCheck("Primary", func(b bool) {})
-	g.location = &widget.Select{Options: []string{"Mirror", "LeftOf", "RightOf", "Above", "Below"}, Selected: "Primary", OnChanged: func(s string) {}}
-	g.resolution = widget.NewLabel("Label")
+	g.resolution = widget.NewSelect([]string{"Option 1", "Option 2"}, func(s string) {})
 
 	return container.NewBorder(
 
@@ -43,14 +47,17 @@ func (g *screenGui) makeUI() fyne.CanvasObject {
 		nil,
 		container.NewPadded(
 			container.NewStack(
-				&canvas.Rectangle{FillColor: color.NRGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, StrokeColor: color.Gray16{Y: 0x0}, StrokeWidth: 5, CornerRadius: 0, Aspect: 1.6},
+				&canvas.Rectangle{FillColor: &color.NRGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, StrokeColor: &color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0x0}, StrokeWidth: 5, CornerRadius: 0, Aspect: 0},
 				container.NewCenter(
-					g.resolution))))
+					container.NewVBox(
+						g.label,
+						g.resolution)))))
 }
 
 func (g *screenGui) makeWindow(a fyne.App) fyne.Window {
 	w := a.NewWindow("screen.gui.go")
-	w.Resize(fyne.NewSize(289, 254))
+	g.win = w
+	w.Resize(fyne.NewSize(293, 254))
 	w.SetContent(g.makeUI())
 	return w
 }

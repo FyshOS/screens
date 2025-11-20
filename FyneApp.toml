@@ -1,5 +1,8 @@
 [Details]
-Name = "screens"
+  Icon = "Icon.png"
+  Name = "screens"
+  ID = "com.fyshos.screens"
+  Build = 0
 
 [Migrations]
   fyneDo = true

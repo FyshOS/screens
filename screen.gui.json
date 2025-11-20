@@ -4,12 +4,12 @@
   },
   "Metadata": {
     "height": 254,
-    "width": 289
+    "width": 293
   },
   "Screens": [
     {
       "Object": {
-        "Type": "*fy  ne.Container",
+        "Type": "*fyne.Container",
         "Layout": "Border",
         "Objects": [
           {
@@ -36,9 +36,6 @@
                   "Importance": 0,
                   "SizeName": "",
                   "Selectable": false
-                },
-                "Properties": {
-                  "name": "name"
                 }
               },
               {
@@ -53,9 +50,6 @@
                       "Text": "Active",
                       "Checked": false,
                       "Partial": false
-                    },
-                    "Properties": {
-                      "name": "active"
                     }
                   },
                   {
@@ -66,9 +60,6 @@
                       "Text": "Primary",
                       "Checked": false,
                       "Partial": false
-                    },
-                    "Properties": {
-                      "name": "primary"
                     }
                   }
                 ],
@@ -91,12 +82,13 @@
                     "Below"
                   ],
                   "PlaceHolder": "(Select one)"
-                },
-                "Properties": {
-                  "name": "location"
                 }
               }
-            ]
+            ],
+            "Properties": {
+              "dir": "vertical",
+              "layout": "VBox"
+            }
           },
           {
             "Type": "*fyne.Container",
@@ -117,10 +109,14 @@
                         "A": 255
                       },
                       "StrokeColor": {
-                        "Y": 0
+                        "R": 0,
+                        "G": 0,
+                        "B": 0,
+                        "A": 0
                       },
                       "StrokeWidth": 5,
-                      "CornerRadius": 0
+                      "CornerRadius": 0,
+                      "Aspect": 0
                     }
                   },
                   {
@@ -128,28 +124,49 @@
                     "Layout": "Center",
                     "Objects": [
                       {
-                        "Type": "*widget.Label",
-                        "Name": "resolution",
-                        "Struct": {
-                          "Hidden": false,
-                          "Text": "Label",
-                          "Alignment": 0,
-                          "Wrapping": 0,
-                          "TextStyle": {
-                            "Bold": false,
-                            "Italic": false,
-                            "Monospace": false,
-                            "Symbol": false,
-                            "TabWidth": 0,
-                            "Underline": false
+                        "Type": "*fyne.Container",
+                        "Layout": "VBox",
+                        "Objects": [
+                          {
+                            "Type": "*widget.Label",
+                            "Name": "label",
+                            "Struct": {
+                              "Hidden": false,
+                              "Text": "Label",
+                              "Alignment": 0,
+                              "Wrapping": 0,
+                              "TextStyle": {
+                                "Bold": false,
+                                "Italic": false,
+                                "Monospace": false,
+                                "Symbol": false,
+                                "TabWidth": 0,
+                                "Underline": false
+                              },
+                              "Truncation": 0,
+                              "Importance": 0,
+                              "SizeName": "",
+                              "Selectable": false
+                            }
                           },
-                          "Truncation": 0,
-                          "Importance": 0,
-                          "SizeName": "",
-                          "Selectable": false
-                        },
+                          {
+                            "Type": "*widget.Select",
+                            "Name": "resolution",
+                            "Struct": {
+                              "Hidden": false,
+                              "Alignment": 0,
+                              "Selected": "",
+                              "Options": [
+                                "Option 1",
+                                "Option 2"
+                              ],
+                              "PlaceHolder": "(Select one)"
+                            }
+                          }
+                        ],
                         "Properties": {
-                          "name": "resolution"
+                          "dir": "vertical",
+                          "layout": "VBox"
                         }
                       }
                     ],
