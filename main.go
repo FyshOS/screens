@@ -205,17 +205,23 @@ func (g *gui) loadScreens(w fyne.Window) {
 			}
 		}
 		panel.resolution.SetOptions(options)
+		panel.screen.SetMinSize(fyne.NewSize(150, 100))
 
 		if output.CurrentMode != nil {
 			selected := fmt.Sprintf("%dx%d", output.CurrentMode.Width, output.CurrentMode.Height)
 			panel.resolution.SetSelected(selected)
+			panel.screen.Aspect = float32(output.CurrentMode.Width) / float32(output.CurrentMode.Height)
 		}
 		panel.resolution.OnChanged = func(m string) {
 			_, err := randr.SetCrtcConfig(conn, output.ctrl, 0, state.configTimestamp,
 				0, 0, modes[m].id, randr.RotationRotate0, []randr.Output{output.id}).Reply()
 			if err != nil {
 				dialog.ShowError(fmt.Errorf("failed to set resolution: %w", err), w)
+				return
 			}
+
+			panel.screen.Aspect = float32(output.CurrentMode.Width) / float32(output.CurrentMode.Height)
+			panel.screen.Refresh()
 		}
 
 		panel.label.Alignment = fyne.TextAlignCenter

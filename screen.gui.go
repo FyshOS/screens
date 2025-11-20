@@ -4,11 +4,12 @@
 package main
 
 import (
+	"image/color"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"image/color"
 )
 
 type screenGui struct {
@@ -20,6 +21,7 @@ type screenGui struct {
 	name       *widget.Label
 	primary    *widget.Check
 	resolution *widget.Select
+	screen     *canvas.Rectangle
 }
 
 func newScreenGUI() *screenGui {
@@ -33,6 +35,7 @@ func (g *screenGui) makeUI() fyne.CanvasObject {
 	g.name = widget.NewLabel("Screen Label")
 	g.primary = widget.NewCheck("Primary", func(b bool) {})
 	g.resolution = widget.NewSelect([]string{"Option 1", "Option 2"}, func(s string) {})
+	g.screen = &canvas.Rectangle{FillColor: &color.NRGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, StrokeColor: color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0xff}, StrokeWidth: 5, CornerRadius: 0, Aspect: 0, TopRightCornerRadius: 0, TopLeftCornerRadius: 0, BottomRightCornerRadius: 0, BottomLeftCornerRadius: 0}
 
 	return container.NewBorder(
 
@@ -47,7 +50,7 @@ func (g *screenGui) makeUI() fyne.CanvasObject {
 		nil,
 		container.NewPadded(
 			container.NewStack(
-				&canvas.Rectangle{FillColor: &color.NRGBA{R: 0x30, G: 0x30, B: 0x30, A: 0xff}, StrokeColor: &color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0x0}, StrokeWidth: 5, CornerRadius: 0, Aspect: 0},
+				g.screen,
 				container.NewCenter(
 					container.NewVBox(
 						g.label,
@@ -55,7 +58,7 @@ func (g *screenGui) makeUI() fyne.CanvasObject {
 }
 
 func (g *screenGui) makeWindow(a fyne.App) fyne.Window {
-	w := a.NewWindow("screen.gui.go")
+	w := a.NewWindow("screen")
 	g.win = w
 	w.Resize(fyne.NewSize(293, 254))
 	w.SetContent(g.makeUI())

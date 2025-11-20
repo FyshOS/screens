@@ -100,6 +100,7 @@
                 "Objects": [
                   {
                     "Type": "*canvas.Rectangle",
+                    "Name": "screen",
                     "Struct": {
                       "Hidden": false,
                       "FillColor": {
@@ -112,11 +113,15 @@
                         "R": 0,
                         "G": 0,
                         "B": 0,
-                        "A": 0
+                        "A": 255
                       },
                       "StrokeWidth": 5,
                       "CornerRadius": 0,
-                      "Aspect": 0
+                      "Aspect": 0,
+                      "TopRightCornerRadius": 0,
+                      "TopLeftCornerRadius": 0,
+                      "BottomRightCornerRadius": 0,
+                      "BottomLeftCornerRadius": 0
                     }
                   },
                   {
