@@ -171,10 +171,11 @@ func (g *gui) loadScreens(w fyne.Window) {
 		panel.name.SetText(output.Name)
 
 		panel.active.SetChecked(true)
+		isPrimary := first
 		if first {
 			panel.active.Disable()
 			panel.primary.SetChecked(true)
-
+			panel.location.Disable()
 			first = false
 		}
 
@@ -210,6 +211,10 @@ func (g *gui) loadScreens(w fyne.Window) {
 		if output.CurrentMode != nil {
 			selected := fmt.Sprintf("%dx%d", output.CurrentMode.Width, output.CurrentMode.Height)
 			panel.resolution.SetSelected(selected)
+			if !isPrimary {
+				primaryCtrl := findController(state.outputs[0].ctrl)
+				panel.location.SetSelected(detectLocation(output, primaryCtrl))
+			}
 			panel.screen.Aspect = float32(output.CurrentMode.Width) / float32(output.CurrentMode.Height)
 		}
 		panel.resolution.OnChanged = func(m string) {
@@ -222,6 +227,11 @@ func (g *gui) loadScreens(w fyne.Window) {
 
 			panel.screen.Aspect = float32(output.CurrentMode.Width) / float32(output.CurrentMode.Height)
 			panel.screen.Refresh()
+		}
+		if !isPrimary {
+			panel.location.OnChanged = func(loc string) {
+				g.applyLocation(w, output, loc)
+			}
 		}
 
 		panel.label.Alignment = fyne.TextAlignCenter
@@ -269,4 +279,137 @@ func (g *gui) deactivate(out Output) {
 
 	// ignore response as we will reload
 	_ = randr.SetCrtcConfig(conn, (*ctrl).id, 0, 0, 0, 0, randr.Mode(0), randr.RotationRotate0, []randr.Output{})
+}
+
+func findController(id randr.Crtc) *Controller {
+	for i := range state.controllers {
+		if state.controllers[i].id == id {
+			return &state.controllers[i]
+		}
+	}
+	return nil
+}
+
+// findCommonModes returns modes (by resolution) supported by all outputs,
+// ordered by the primary output's preference.
+func findCommonModes(outputs []Output) []Mode {
+	if len(outputs) == 0 {
+		return nil
+	}
+	var common []Mode
+	seen := map[string]bool{}
+	for _, m := range outputs[0].Modes {
+		key := fmt.Sprintf("%dx%d", m.Width, m.Height)
+		if seen[key] {
+			continue
+		}
+		allSupport := true
+		for _, o := range outputs[1:] {
+			found := false
+			for _, om := range o.Modes {
+				if om.Width == m.Width && om.Height == m.Height {
+					found = true
+					break
+				}
+			}
+			if !found {
+				allSupport = false
+				break
+			}
+		}
+		if allSupport {
+			seen[key] = true
+			common = append(common, m)
+		}
+	}
+	return common
+}
+
+// findModeForOutput returns the first mode in out.Modes matching the given resolution.
+func findModeForOutput(out Output, width, height uint16) *Mode {
+	for i := range out.Modes {
+		if out.Modes[i].Width == width && out.Modes[i].Height == height {
+			return &out.Modes[i]
+		}
+	}
+	return nil
+}
+
+// detectLocation infers the location of out relative to primaryCtrl.
+func detectLocation(out Output, primaryCtrl *Controller) string {
+	if primaryCtrl == nil {
+		return "RightOf"
+	}
+	ctrl := findController(out.ctrl)
+	if ctrl == nil {
+		return "RightOf"
+	}
+	if ctrl.X == primaryCtrl.X && ctrl.Y == primaryCtrl.Y {
+		return "Mirror"
+	}
+	if ctrl.X < primaryCtrl.X {
+		return "LeftOf"
+	}
+	if ctrl.X > primaryCtrl.X {
+		return "RightOf"
+	}
+	if ctrl.Y < primaryCtrl.Y {
+		return "Above"
+	}
+	return "Below"
+}
+
+func (g *gui) applyLocation(w fyne.Window, out Output, location string) {
+	switch location {
+	case "Mirror":
+		commonModes := findCommonModes(state.outputs)
+		if len(commonModes) == 0 {
+			dialog.ShowError(fmt.Errorf("no common resolution found for mirroring"), w)
+			return
+		}
+		best := commonModes[0]
+		for _, o := range state.outputs {
+			m := findModeForOutput(o, best.Width, best.Height)
+			if m == nil {
+				continue
+			}
+			_, err := randr.SetCrtcConfig(conn, o.ctrl, 0, state.configTimestamp,
+				0, 0, m.id, randr.RotationRotate0, []randr.Output{o.id}).Reply()
+			if err != nil {
+				dialog.ShowError(fmt.Errorf("failed to mirror display: %w", err), w)
+				return
+			}
+		}
+	default:
+		if len(state.outputs) == 0 {
+			return
+		}
+		primaryCtrl := findController(state.outputs[0].ctrl)
+		if primaryCtrl == nil || primaryCtrl.Mode == nil || len(out.Modes) == 0 {
+			return
+		}
+		preferred := out.Modes[0]
+		var x, y int16
+		switch location {
+		case "LeftOf":
+			x = primaryCtrl.X - int16(preferred.Width)
+			y = primaryCtrl.Y
+		case "RightOf":
+			x = primaryCtrl.X + int16(primaryCtrl.Mode.Width)
+			y = primaryCtrl.Y
+		case "Above":
+			x = primaryCtrl.X
+			y = primaryCtrl.Y - int16(preferred.Height)
+		case "Below":
+			x = primaryCtrl.X
+			y = primaryCtrl.Y + int16(primaryCtrl.Mode.Height)
+		default:
+			return
+		}
+		_, err := randr.SetCrtcConfig(conn, out.ctrl, 0, state.configTimestamp,
+			x, y, preferred.id, randr.RotationRotate0, []randr.Output{out.id}).Reply()
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("failed to position display: %w", err), w)
+		}
+	}
 }
