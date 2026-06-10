@@ -13,7 +13,7 @@ func main() {
 
 	w := a.NewWindow("Screens")
 	w.Resize(fyne.NewSize(376, 263))
-	screens, done := screenmanager.NewGUI(w)
+	screens := screenmanager.New(w)
 	g := newGUI()
 	ui := g.makeUI()
 	g.screens.Objects = []fyne.CanvasObject{screens}
@@ -21,7 +21,7 @@ func main() {
 	w.SetContent(ui)
 
 	w.ShowAndRun()
-	done()
+	screens.Close()
 }
 
 // here you can add some button / callbacks code using widget IDs
