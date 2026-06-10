@@ -19,6 +19,13 @@ var (
 	state State
 )
 
+// OnConfigurationChanged, if set, is invoked whenever the screen or layout
+// configuration changes — for example a monitor being plugged in or removed,
+// or a resolution or position change. It is called on the main goroutine after
+// the internal state and UI have been refreshed, so it is safe to query the
+// current configuration or update Fyne widgets from within the callback.
+var OnConfigurationChanged func()
+
 func (g *screensGui) setup(w fyne.Window) {
 	if conn == nil {
 		return
@@ -41,10 +48,17 @@ func (g *screensGui) setup(w fyne.Window) {
 				continue
 			}
 
+			// ScreenChangeNotifyEvent fires when the screen layout changes;
+			// NotifyEvent fires for CRTC/output changes, including a monitor
+			// being physically plugged in or removed. Refresh the UI for any
+			// of them so the display list stays in sync with the hardware.
 			switch ev.(type) {
-			case randr.ScreenChangeNotifyEvent:
+			case randr.ScreenChangeNotifyEvent, randr.NotifyEvent:
 				fyne.Do(func() {
 					g.loadScreens(w)
+					if OnConfigurationChanged != nil {
+						OnConfigurationChanged()
+					}
 				})
 			}
 		}

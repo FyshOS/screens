@@ -12,7 +12,6 @@ import (
 func NewGUI(w fyne.Window) (fyne.CanvasObject, func()) {
 	g := newScreensGUI()
 	ui := g.makeUI()
-	g.setup(w)
 
 	c, err := xgb.NewConn()
 	if err != nil {
@@ -22,6 +21,9 @@ func NewGUI(w fyne.Window) (fyne.CanvasObject, func()) {
 		err = randr.Init(conn)
 		root = xproto.Setup(conn).DefaultScreen(conn).Root
 
+		// Start listening for monitor hotplug / configuration changes
+		// before the first load so no events are missed.
+		g.setup(w)
 		g.loadScreens(w)
 	}
 
