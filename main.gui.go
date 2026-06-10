@@ -5,16 +5,15 @@ package main
 
 import (
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"image/color"
 )
 
 type gui struct {
-	connected *fyne.Container
-	offline   *fyne.Container
+	win fyne.Window
+
+	screens *fyne.Container
 }
 
 func newGUI() *gui {
@@ -22,13 +21,8 @@ func newGUI() *gui {
 }
 
 func (g *gui) makeUI() fyne.CanvasObject {
-	g.connected = container.NewGridWithRows(1,
-		container.NewStack(
-			&canvas.Rectangle{FillColor: &color.NRGBA{R: 0xa0, G: 0xa0, B: 0xa0, A: 0xff}, StrokeColor: &color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0x0}, StrokeWidth: 4, CornerRadius: 2, Aspect: 1.6},
-			container.NewCenter(
-				&canvas.Text{Alignment: 0, Color: color.NRGBA{R: 0x0, G: 0x0, B: 0x0, A: 0xff}, Text: "Monitor 1", TextSize: 11, TextStyle: fyne.TextStyle{Bold: false, Italic: false, Monospace: false, Symbol: false, TabWidth: 0, Underline: false}, FontSource: nil})))
-	g.offline = container.NewHBox(
-		widget.NewCheck("HDMI-1", func(b bool) {}))
+	g.screens = container.NewStack(
+		&widget.Label{Text: "SCREENS LOAD HERE", Alignment: 1, Wrapping: 0})
 
 	return container.NewBorder(
 
@@ -42,19 +36,13 @@ func (g *gui) makeUI() fyne.CanvasObject {
 		nil,
 		nil,
 		nil,
-		container.NewStack(
-			g.connected,
-			container.NewBorder(
-				nil,
-
-				g.offline,
-				nil,
-				nil)))
+		g.screens)
 }
 
 func (g *gui) makeWindow(a fyne.App) fyne.Window {
-	w := a.NewWindow("Screens")
-	w.Resize(fyne.NewSize(376, 263))
+	w := a.NewWindow("main")
+	g.win = w
+	w.Resize(fyne.NewSize(380, 263))
 	w.SetContent(g.makeUI())
 	return w
 }

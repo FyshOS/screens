@@ -4,7 +4,7 @@
   },
   "Metadata": {
     "height": 263,
-    "width": 376
+    "width": 380
   },
   "Screens": [
     {
@@ -40,120 +40,33 @@
           {
             "Type": "*fyne.Container",
             "Layout": "Stack",
+            "Name": "screens",
             "Objects": [
               {
-                "Type": "*fyne.Container",
-                "Layout": "Grid",
-                "Name": "connected",
-                "Objects": [
-                  {
-                    "Type": "*fyne.Container",
-                    "Layout": "Stack",
-                    "Objects": [
-                      {
-                        "Type": "*canvas.Rectangle",
-                        "Struct": {
-                          "Hidden": false,
-                          "FillColor": {
-                            "R": 160,
-                            "G": 160,
-                            "B": 160,
-                            "A": 255
-                          },
-                          "StrokeColor": {
-                            "R": 0,
-                            "G": 0,
-                            "B": 0,
-                            "A": 0
-                          },
-                          "StrokeWidth": 4,
-                          "CornerRadius": 2,
-                          "Aspect": 0
-                        }
-                      },
-                      {
-                        "Type": "*fyne.Container",
-                        "Layout": "Center",
-                        "Objects": [
-                          {
-                            "Type": "*canvas.Text",
-                            "Struct": {
-                              "Hidden": false,
-                              "Alignment": 0,
-                              "Color": {
-                                "R": 0,
-                                "G": 0,
-                                "B": 0,
-                                "A": 255
-                              },
-                              "Text": "Monitor 1",
-                              "TextSize": 11,
-                              "TextStyle": {
-                                "Bold": false,
-                                "Italic": false,
-                                "Monospace": false,
-                                "Symbol": false,
-                                "TabWidth": 0,
-                                "Underline": false
-                              },
-                              "FontSource": null
-                            }
-                          }
-                        ],
-                        "Properties": {
-                          "layout": "Center"
-                        }
-                      }
-                    ],
-                    "Properties": {
-                      "layout": "Stack"
-                    }
-                  }
-                ],
-                "Properties": {
-                  "count": "1",
-                  "grid_type": "Rows",
-                  "layout": "Grid",
-                  "name": "connected"
-                }
-              },
-              {
-                "Type": "*fyne.Container",
-                "Layout": "Border",
-                "Objects": [
-                  {
-                    "Type": "*fyne.Container",
-                    "Layout": "HBox",
-                    "Name": "offline",
-                    "Objects": [
-                      {
-                        "Type": "*widget.Check",
-                        "Struct": {
-                          "Hidden": false,
-                          "Text": "HDMI-1",
-                          "Checked": false,
-                          "Partial": false
-                        }
-                      }
-                    ],
-                    "Properties": {
-                      "dir": "horizontal",
-                      "layout": "HBox",
-                      "name": "offline"
-                    }
-                  }
-                ],
-                "Properties": {
-                  "bottom": "0",
-                  "layout": "Border",
-                  "left": "",
-                  "right": "",
-                  "top": ""
+                "Type": "*widget.Label",
+                "Struct": {
+                  "Hidden": false,
+                  "Text": "SCREENS LOAD HERE",
+                  "Alignment": 1,
+                  "Wrapping": 0,
+                  "TextStyle": {
+                    "Bold": false,
+                    "Italic": false,
+                    "Monospace": false,
+                    "Symbol": false,
+                    "TabWidth": 0,
+                    "Underline": false
+                  },
+                  "Truncation": 0,
+                  "Importance": 0,
+                  "SizeName": "",
+                  "Selectable": false
                 }
               }
             ],
             "Properties": {
-              "layout": "Stack"
+              "layout": "Stack",
+              "name": "screens"
             }
           }
         ],

@@ -1,4 +1,4 @@
-module screens
+module github.com/FyshOS/screens
 
 go 1.19
 

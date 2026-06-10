@@ -1,4 +1,4 @@
-package main
+package screenmanager
 
 import (
 	"github.com/BurntSushi/xgb/randr"
