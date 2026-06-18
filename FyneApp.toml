@@ -1,8 +1,11 @@
 [Details]
-  Icon = "Icon.png"
-  Name = "screens"
-  ID = "com.fyshos.screens"
-  Build = 0
+Icon = "Icon.png"
+Name = "Screens"
+ID = "com.fyshos.screens"
+Build = 0
 
 [Migrations]
-  fyneDo = true
+fyneDo = true
+
+[LinuxAndBSD]
+Categories = ["System"]
