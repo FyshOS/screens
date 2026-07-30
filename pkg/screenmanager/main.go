@@ -134,16 +134,17 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 
 	for i, output := range newState.outputs {
 		if output.CurrentMode == nil {
+			index := i
 			other := widget.NewCheck(output.Name, func(on bool) {
 				if !on {
 					return
 				}
 
-				g.activate(state.outputs[i])
+				g.activate(state.outputs[index])
 			})
 
 			g.offline.Add(other)
-			return
+			continue
 		}
 
 		panel := &screenGui{}
@@ -191,21 +192,41 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 		if output.CurrentMode != nil {
 			selected := fmt.Sprintf("%dx%d", output.CurrentMode.Width, output.CurrentMode.Height)
 			panel.resolution.SetSelected(selected)
-			if !isPrimary {
-				primaryCtrl := findController(state.outputs[0].ctrl)
+			if active := activeOutputs(); !isPrimary && len(active) > 0 {
+				primaryCtrl := findController(active[0].ctrl)
 				panel.location.SetSelected(detectLocation(output, primaryCtrl))
 			}
 			panel.screen.Aspect = float32(output.CurrentMode.Width) / float32(output.CurrentMode.Height)
 		}
 		panel.resolution.OnChanged = func(m string) {
-			_, err := randr.SetCrtcConfig(conn, output.ctrl, 0, state.configTimestamp,
-				0, 0, modes[m].id, randr.RotationRotate0, []randr.Output{output.id}).Reply()
-			if err != nil {
+			mode, ok := modes[m]
+			if !ok {
+				return
+			}
+
+			// Change only the mode: the screen keeps its place in the layout, and
+			// the desktop resizes around the new size.
+			places := currentPlacements()
+			found := false
+			for i := range places {
+				if places[i].output != output.id {
+					continue
+				}
+
+				places[i].mode = &mode
+				found = true
+			}
+			if !found {
+				places = append(places, placement{crtc: output.ctrl, output: output.id,
+					name: output.Name, mode: &mode})
+			}
+
+			if err := applyLayout(places); err != nil {
 				dialog.ShowError(fmt.Errorf("failed to set resolution: %w", err), w)
 				return
 			}
 
-			panel.screen.Aspect = float32(output.CurrentMode.Width) / float32(output.CurrentMode.Height)
+			panel.screen.Aspect = float32(mode.Width) / float32(mode.Height)
 			panel.screen.Refresh()
 		}
 		if !isPrimary {
@@ -222,13 +243,16 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 }
 
 func (g *screensGui) activate(out Output) {
-	x := int16(0) // just assume RightOf TODO configure
+	if len(out.Modes) == 0 {
+		fyne.LogError("Output has no modes to activate!", nil)
+		return
+	}
+
 	var ctrl *Controller
-	for _, c := range state.controllers {
-		if c.Mode == nil {
-			ctrl = &c
-		} else {
-			x += int16(c.Mode.Width)
+	for i := range state.controllers {
+		if state.controllers[i].Mode == nil {
+			ctrl = &state.controllers[i]
+			break
 		}
 	}
 	if ctrl == nil {
@@ -236,29 +260,54 @@ func (g *screensGui) activate(out Output) {
 		return
 	}
 
-	// Use config timestamp and check for errors
-	_, err := randr.SetCrtcConfig(conn, (*ctrl).id, 0, state.configTimestamp,
-		x, 0, out.Modes[0].id, randr.RotationRotate0, []randr.Output{out.id}).Reply()
-	if err != nil {
+	places := currentPlacements()
+
+	x := int16(0) // just assume RightOf TODO configure
+	for _, place := range places {
+		if place.mode == nil {
+			continue
+		}
+
+		if right := place.x + int16(place.mode.Width); right > x {
+			x = right
+		}
+	}
+
+	places = append(places, placement{crtc: ctrl.id, output: out.id, name: out.Name,
+		mode: &out.Modes[0], x: x})
+	if err := applyLayout(places); err != nil {
 		fyne.LogError("Failed to activate output", err)
 	}
 }
 
 func (g *screensGui) deactivate(out Output) {
-	var ctrl *Controller
-	for _, c := range state.controllers {
-		if c.Mode == out.CurrentMode {
-			ctrl = &c
-			break
-		}
-	}
-	if ctrl == nil {
+	if out.ctrl == 0 {
 		fyne.LogError("Cannot find matching controller!", nil)
 		return
 	}
 
-	// ignore response as we will reload
-	_ = randr.SetCrtcConfig(conn, (*ctrl).id, 0, 0, 0, 0, randr.Mode(0), randr.RotationRotate0, []randr.Output{})
+	// Switch the screen off first, then shrink the desktop around what is left
+	// of the layout.
+	if err := disableCrtc(out.ctrl, out.Name); err != nil {
+		fyne.LogError("Failed to deactivate output", err)
+		return
+	}
+
+	var places []placement
+	for _, place := range currentPlacements() {
+		if place.crtc == out.ctrl {
+			continue
+		}
+
+		places = append(places, place)
+	}
+	if len(places) == 0 {
+		return
+	}
+
+	if err := applyLayout(places); err != nil {
+		fyne.LogError("Failed to resize the desktop after deactivating output", err)
+	}
 }
 
 func findController(id randr.Crtc) *Controller {
@@ -305,6 +354,19 @@ func findCommonModes(outputs []Output) []Mode {
 	return common
 }
 
+// largestMode returns the mode covering the most pixels, so that mirroring picks
+// the best resolution the screens share rather than whichever one the primary
+// happens to list first.
+func largestMode(modes []Mode) Mode {
+	best := modes[0]
+	for _, m := range modes[1:] {
+		if int32(m.Width)*int32(m.Height) > int32(best.Width)*int32(best.Height) {
+			best = m
+		}
+	}
+	return best
+}
+
 // findModeForOutput returns the first mode in out.Modes matching the given resolution.
 func findModeForOutput(out Output, width, height uint16) *Mode {
 	for i := range out.Modes {
@@ -340,34 +402,41 @@ func detectLocation(out Output, primaryCtrl *Controller) string {
 }
 
 func (g *screensGui) applyLocation(w fyne.Window, out Output, location string) {
+	active := activeOutputs()
+	if len(active) == 0 {
+		return
+	}
+
+	var places []placement
 	switch location {
 	case "Mirror":
-		commonModes := findCommonModes(state.outputs)
+		commonModes := findCommonModes(active)
 		if len(commonModes) == 0 {
 			dialog.ShowError(fmt.Errorf("no common resolution found for mirroring"), w)
 			return
 		}
-		best := commonModes[0]
-		for _, o := range state.outputs {
+
+		// Every screen shows the same area from the origin, so the desktop
+		// shrinks to that one resolution.
+		best := largestMode(commonModes)
+		for _, o := range active {
 			m := findModeForOutput(o, best.Width, best.Height)
 			if m == nil {
-				continue
-			}
-			_, err := randr.SetCrtcConfig(conn, o.ctrl, 0, state.configTimestamp,
-				0, 0, m.id, randr.RotationRotate0, []randr.Output{o.id}).Reply()
-			if err != nil {
-				dialog.ShowError(fmt.Errorf("failed to mirror display: %w", err), w)
+				dialog.ShowError(fmt.Errorf("%s cannot display %dx%d", o.Name, best.Width, best.Height), w)
 				return
 			}
+
+			places = append(places, placement{crtc: o.ctrl, output: o.id, name: o.Name, mode: m})
 		}
 	default:
-		if len(state.outputs) == 0 {
+		if out.ctrl == 0 {
 			return
 		}
-		primaryCtrl := findController(state.outputs[0].ctrl)
+		primaryCtrl := findController(active[0].ctrl)
 		if primaryCtrl == nil || primaryCtrl.Mode == nil || len(out.Modes) == 0 {
 			return
 		}
+
 		preferred := out.Modes[0]
 		var x, y int16
 		switch location {
@@ -386,10 +455,19 @@ func (g *screensGui) applyLocation(w fyne.Window, out Output, location string) {
 		default:
 			return
 		}
-		_, err := randr.SetCrtcConfig(conn, out.ctrl, 0, state.configTimestamp,
-			x, y, preferred.id, randr.RotationRotate0, []randr.Output{out.id}).Reply()
-		if err != nil {
-			dialog.ShowError(fmt.Errorf("failed to position display: %w", err), w)
+
+		for _, place := range currentPlacements() {
+			if place.output == out.id {
+				continue
+			}
+
+			places = append(places, place)
 		}
+		places = append(places, placement{crtc: out.ctrl, output: out.id, name: out.Name,
+			mode: &preferred, x: x, y: y})
+	}
+
+	if err := applyLayout(places); err != nil {
+		dialog.ShowError(fmt.Errorf("failed to arrange displays: %w", err), w)
 	}
 }
