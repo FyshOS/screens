@@ -92,6 +92,10 @@ func applyLayout(places []placement) error {
 func normalise(places []placement) {
 	var minX, minY int16
 	for _, place := range places {
+		if place.mode == nil {
+			continue // switched off, so it is not part of the layout
+		}
+
 		if place.x < minX {
 			minX = place.x
 		}
@@ -240,11 +244,6 @@ func trySetCrtcConfig(place placement, mode randr.Mode, outputs []randr.Output) 
 	}
 
 	return reply.Status, nil
-}
-
-// disableCrtc switches a controller off, leaving the desktop size alone.
-func disableCrtc(crtc randr.Crtc, name string) error {
-	return configureCrtc(placement{crtc: crtc, name: name})
 }
 
 // refreshConfigTimestamp re-reads the configuration timestamp that RandR uses to

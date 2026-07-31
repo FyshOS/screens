@@ -2,6 +2,8 @@ package screenmanager
 
 import (
 	"fmt"
+	"strings"
+	"sync/atomic"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/dialog"
@@ -17,6 +19,17 @@ var (
 	root xproto.Window
 
 	state State
+
+	// applying is set while we are reconfiguring the screens ourselves. A change
+	// takes several requests and the server reports each one - ignore them.
+	applying atomic.Bool
+
+	// displayed describes the configuration - remember to avoid change triggering.
+	displayed string
+	loaded    bool
+
+	// onChanged notifies the caller that the configuration changed.
+	onChanged func()
 )
 
 func (g *screensGui) setup(w fyne.Window, s *Screens) {
@@ -24,6 +37,15 @@ func (g *screensGui) setup(w fyne.Window, s *Screens) {
 		return
 	}
 
+	g.win = w
+	onChanged = func() {
+		if s.OnConfigurationChanged != nil {
+			s.OnConfigurationChanged()
+		}
+	}
+
+	// Previous instance configuration.
+	displayed, loaded = "", false
 	go func() {
 		err := randr.SelectInputChecked(conn, root,
 			randr.NotifyMaskScreenChange|
@@ -47,25 +69,66 @@ func (g *screensGui) setup(w fyne.Window, s *Screens) {
 			// of them so the display list stays in sync with the hardware.
 			switch ev.(type) {
 			case randr.ScreenChangeNotifyEvent, randr.NotifyEvent:
-				fyne.Do(func() {
-					g.loadScreens(w)
-					if s.OnConfigurationChanged != nil {
-						s.OnConfigurationChanged()
-					}
-				})
+				if applying.Load() {
+					// One of our own requests, reported part way through the
+					// change we are making. We reload once it is complete.
+					continue
+				}
+
+				fyne.Do(g.reload)
 			}
 		}
 	}()
 }
 
-func (g *screensGui) loadScreens(w fyne.Window) {
-	g.connected.RemoveAll()
-	g.offline.RemoveAll()
+// reload refreshes the UI from the hardware and, if anything actually changed,
+// tells the caller about it.
+func (g *screensGui) reload() {
+	if g.loadScreens(g.win) && onChanged != nil {
+		onChanged()
+	}
+}
 
+// apply makes a configuration change without rebuilding the UI while it is in progress.
+// One reload at the end picks up whatever the server settled on.
+func (g *screensGui) apply(places []placement) error {
+	applying.Store(true)
+	defer func() {
+		applying.Store(false)
+
+		go fyne.Do(g.reload)
+	}()
+
+	return applyLayout(places)
+}
+
+// configSignature describes everything the panels are built from.
+func configSignature(s State) string {
+	var b strings.Builder
+	for _, out := range s.outputs {
+		fmt.Fprintf(&b, "%d:%s:%d:", out.id, out.Name, out.ctrl)
+		if out.CurrentMode != nil {
+			fmt.Fprintf(&b, "%dx%d", out.CurrentMode.Width, out.CurrentMode.Height)
+		}
+		for _, m := range out.Modes {
+			fmt.Fprintf(&b, ",%dx%d", m.Width, m.Height)
+		}
+		b.WriteByte(';')
+	}
+	for _, ctrl := range s.controllers {
+		fmt.Fprintf(&b, "%d@%d,%d;", ctrl.id, ctrl.X, ctrl.Y)
+	}
+
+	return b.String()
+}
+
+// loadScreens reads the current configuration and rebuilds the panels, returning
+// whether anything changed.
+func (g *screensGui) loadScreens(w fyne.Window) bool {
 	resources, err := randr.GetScreenResources(conn, root).Reply()
 	if err != nil {
 		dialog.ShowError(err, w)
-		return
+		return false
 	}
 
 	newState := State{
@@ -79,7 +142,7 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 		info, err := randr.GetCrtcInfo(conn, crtc, resources.ConfigTimestamp).Reply()
 		if err != nil {
 			dialog.ShowError(err, w)
-			return
+			return false
 		}
 
 		var m *Mode
@@ -99,7 +162,7 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 		info, err := randr.GetOutputInfo(conn, screen, 0).Reply()
 		if err != nil {
 			dialog.ShowError(err, w)
-			return
+			return false
 		}
 
 		if info.Connection != randr.ConnectionConnected {
@@ -132,6 +195,16 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 	}
 	state = newState
 
+	// Only rebuild when there is something new to show.
+	signature := configSignature(newState)
+	if loaded && signature == displayed {
+		return false
+	}
+	displayed, loaded = signature, true
+
+	g.connected.RemoveAll()
+	g.offline.RemoveAll()
+
 	for i, output := range newState.outputs {
 		if output.CurrentMode == nil {
 			index := i
@@ -160,12 +233,13 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 			first = false
 		}
 
+		index, out := i, output
 		panel.active.OnChanged = func(on bool) {
 			if on {
 				return
 			}
 
-			g.deactivate(state.outputs[i])
+			g.deactivate(state.outputs[index])
 		}
 
 		modes := map[string]Mode{}
@@ -209,7 +283,7 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 			places := currentPlacements()
 			found := false
 			for i := range places {
-				if places[i].output != output.id {
+				if places[i].output != out.id {
 					continue
 				}
 
@@ -217,11 +291,11 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 				found = true
 			}
 			if !found {
-				places = append(places, placement{crtc: output.ctrl, output: output.id,
-					name: output.Name, mode: &mode})
+				places = append(places, placement{crtc: out.ctrl, output: out.id,
+					name: out.Name, mode: &mode})
 			}
 
-			if err := applyLayout(places); err != nil {
+			if err := g.apply(places); err != nil {
 				dialog.ShowError(fmt.Errorf("failed to set resolution: %w", err), w)
 				return
 			}
@@ -231,7 +305,7 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 		}
 		if !isPrimary {
 			panel.location.OnChanged = func(loc string) {
-				g.applyLocation(w, output, loc)
+				g.applyLocation(w, out, loc)
 			}
 		}
 
@@ -240,6 +314,8 @@ func (g *screensGui) loadScreens(w fyne.Window) {
 
 		g.connected.Add(ui)
 	}
+
+	return true
 }
 
 func (g *screensGui) activate(out Output) {
@@ -275,7 +351,7 @@ func (g *screensGui) activate(out Output) {
 
 	places = append(places, placement{crtc: ctrl.id, output: out.id, name: out.Name,
 		mode: &out.Modes[0], x: x})
-	if err := applyLayout(places); err != nil {
+	if err := g.apply(places); err != nil {
 		fyne.LogError("Failed to activate output", err)
 	}
 }
@@ -286,27 +362,24 @@ func (g *screensGui) deactivate(out Output) {
 		return
 	}
 
-	// Switch the screen off first, then shrink the desktop around what is left
-	// of the layout.
-	if err := disableCrtc(out.ctrl, out.Name); err != nil {
-		fyne.LogError("Failed to deactivate output", err)
-		return
-	}
-
-	var places []placement
-	for _, place := range currentPlacements() {
-		if place.crtc == out.ctrl {
+	// Deactivate in the correct order.
+	places := currentPlacements()
+	remaining := 0
+	for i := range places {
+		if places[i].crtc == out.ctrl {
+			places[i].mode = nil
 			continue
 		}
 
-		places = append(places, place)
+		remaining++
 	}
-	if len(places) == 0 {
+	if remaining == 0 {
+		fyne.LogError("Cannot switch off the last active screen!", nil)
 		return
 	}
 
-	if err := applyLayout(places); err != nil {
-		fyne.LogError("Failed to resize the desktop after deactivating output", err)
+	if err := g.apply(places); err != nil {
+		fyne.LogError("Failed to deactivate output", err)
 	}
 }
 
@@ -467,7 +540,7 @@ func (g *screensGui) applyLocation(w fyne.Window, out Output, location string) {
 			mode: &preferred, x: x, y: y})
 	}
 
-	if err := applyLayout(places); err != nil {
+	if err := g.apply(places); err != nil {
 		dialog.ShowError(fmt.Errorf("failed to arrange displays: %w", err), w)
 	}
 }

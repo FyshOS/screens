@@ -106,6 +106,44 @@ func TestNormaliseShiftsToOrigin(t *testing.T) {
 	}
 }
 
+// TestConfigSignature covers the check that stops the repeated events the server
+// sends for one change from rebuilding the panels each time, which detaches
+// whatever the pointer is on from the canvas.
+func TestConfigSignature(t *testing.T) {
+	sideBySide := State{
+		outputs: []Output{
+			{id: 1, Name: "eDP-1", ctrl: 10, CurrentMode: mode(1920, 1080), Modes: []Mode{{Width: 1920, Height: 1080}}},
+			{id: 2, Name: "HDMI-1", ctrl: 11, CurrentMode: mode(1920, 1080), Modes: []Mode{{Width: 1920, Height: 1080}}},
+		},
+		controllers: []Controller{{id: 10}, {id: 11, X: 1920}},
+	}
+
+	same := sideBySide
+	if configSignature(sideBySide) != configSignature(same) {
+		t.Error("an unchanged configuration should produce the same signature")
+	}
+
+	// The second screen moves to the origin, which is what mirroring does.
+	mirrored := sideBySide
+	mirrored.controllers = []Controller{{id: 10}, {id: 11}}
+	if configSignature(sideBySide) == configSignature(mirrored) {
+		t.Error("moving a screen should produce a different signature")
+	}
+
+	unplugged := sideBySide
+	unplugged.outputs = sideBySide.outputs[:1]
+	if configSignature(sideBySide) == configSignature(unplugged) {
+		t.Error("losing a screen should produce a different signature")
+	}
+
+	switchedOff := sideBySide
+	switchedOff.outputs = []Output{sideBySide.outputs[0], {id: 2, Name: "HDMI-1",
+		Modes: []Mode{{Width: 1920, Height: 1080}}}}
+	if configSignature(sideBySide) == configSignature(switchedOff) {
+		t.Error("switching a screen off should produce a different signature")
+	}
+}
+
 func TestLargestMode(t *testing.T) {
 	// Ordered as an output lists them, preferred first, so the largest is not
 	// simply the first entry.
